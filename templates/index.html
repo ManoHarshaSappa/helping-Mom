@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#8b2500" />
+  <title>హరికథా Post Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #fdf6ec;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%;
+      background: linear-gradient(135deg, #8b2500, #c06000);
+      color: #fff;
+      text-align: center;
+      padding: 20px 16px 16px;
+    }
+    header h1 {
+      font-size: clamp(20px, 5vw, 26px);
+      letter-spacing: 0.5px;
+    }
+    header p {
+      margin-top: 6px;
+      font-size: clamp(12px, 3.5vw, 14px);
+      opacity: 0.88;
+    }
+
+    /* ── Main layout ── */
+    .container {
+      width: 100%;
+      max-width: 900px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* ── Tabs (mobile only) ── */
+    .tabs {
+      display: none;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid #e8c99a;
+    }
+    .tabs button {
+      flex: 1;
+      padding: 12px 8px;
+      font-size: 14px;
+      font-weight: 600;
+      background: #fff;
+      color: #8b2500;
+      border: none;
+      border-radius: 0;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .tabs button.active {
+      background: #8b2500;
+      color: #fff;
+    }
+
+    /* ── Two-column on desktop, stacked on mobile ── */
+    .boxes {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .box-label {
+      font-size: 13px;
+      font-weight: 700;
+      color: #8b2500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 240px;
+      border: 2px solid #e8c99a;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      line-height: 1.65;
+      resize: none;
+      outline: none;
+      font-family: inherit;
+      background: #fffdf8;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    textarea:focus { border-color: #c06000; }
+    textarea[readonly] {
+      background: #f7f7f7;
+      color: #222;
+    }
+
+    /* ── Actions ── */
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      transition: background 0.2s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    button:active { transform: scale(0.96); }
+
+    #btn-generate {
+      flex: 1;
+      padding: 15px 12px;
+      background: #c06000;
+      color: #fff;
+    }
+    #btn-generate:hover { background: #a04e00; }
+    #btn-generate:disabled {
+      background: #d4a06a;
+      cursor: not-allowed;
+    }
+
+    #btn-copy {
+      padding: 15px 18px;
+      background: #e8f5e9;
+      color: #2e7d32;
+      border: 2px solid #a5d6a7;
+    }
+    #btn-copy:hover { background: #c8e6c9; }
+    #btn-copy.copied { background: #c8e6c9; color: #1b5e20; }
+
+    #btn-clear {
+      padding: 15px 18px;
+      background: #fce4ec;
+      color: #880e4f;
+      border: 2px solid #f48fb1;
+    }
+    #btn-clear:hover { background: #f8bbd0; }
+
+    /* ── Status ── */
+    #status {
+      text-align: center;
+      font-size: 14px;
+      min-height: 20px;
+    }
+    #status.error   { color: #c62828; }
+    #status.ok      { color: #2e7d32; }
+    #status.loading { color: #c06000; }
+
+    .spinner {
+      display: inline-block;
+      width: 15px; height: 15px;
+      border: 2px solid #c06000;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Mobile styles ── */
+    @media (max-width: 640px) {
+      .tabs { display: flex; }
+
+      .boxes { grid-template-columns: 1fr; }
+
+      .panel { display: none; }
+      .panel.active { display: flex; }
+
+      textarea { height: 52vw; min-height: 180px; }
+
+      .actions { flex-wrap: wrap; }
+      #btn-generate { order: -1; width: 100%; flex: none; }
+      #btn-copy, #btn-clear { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎵 హరికథా Post Generator</h1>
+  <p>మీ performance వివరాలు రాయండి → Post వస్తుంది</p>
+</header>
+
+<div class="container">
+
+  <!-- Tabs visible only on mobile -->
+  <div class="tabs">
+    <button id="tab-input"  class="active" onclick="switchTab('input')">📝 Input</button>
+    <button id="tab-output" onclick="switchTab('output')">✨ Generated Post</button>
+  </div>
+
+  <div class="boxes">
+    <!-- INPUT -->
+    <div class="panel active" id="panel-input">
+      <div class="box-label">📝 మీ Performance Description</div>
+      <textarea id="input-text"
+        placeholder="ఇక్కడ మీ performance గురించి Telugu లో రాయండి...
+
+Example:
+నేటి రాత్రి శ్రీరామ నవమి సందర్భంగా విజయవాడ కనక దుర్గమ్మ ఆలయంలో హరికథ చాలా భక్తి శ్రద్ధలతో జరిగింది."></textarea>
+      <div class="actions" id="input-actions">
+        <button id="btn-clear">🗑 Clear</button>
+        <button id="btn-generate">✨ Generate Post</button>
+      </div>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="panel active" id="panel-output">
+      <div class="box-label">✨ Generated Post</div>
+      <textarea id="output-text" readonly
+        placeholder="Generate నొక్కిన తర్వాత ఇక్కడ post వస్తుంది..."></textarea>
+      <div class="actions" id="output-actions">
+        <button id="btn-copy">📋 Copy Post</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="status"></div>
+
+</div>
+
+<script>
+  const inputEl  = document.getElementById('input-text');
+  const outputEl = document.getElementById('output-text');
+  const btnGen   = document.getElementById('btn-generate');
+  const btnCopy  = document.getElementById('btn-copy');
+  const btnClear = document.getElementById('btn-clear');
+  const status   = document.getElementById('status');
+
+  function setStatus(msg, type = '') {
+    status.innerHTML = msg;
+    status.className = type;
+  }
+
+  // ── Tab switching (mobile) ──
+  function switchTab(tab) {
+    const isMobile = window.innerWidth <= 640;
+    document.getElementById('tab-input').classList.toggle('active', tab === 'input');
+    document.getElementById('tab-output').classList.toggle('active', tab === 'output');
+    if (isMobile) {
+      document.getElementById('panel-input').classList.toggle('active', tab === 'input');
+      document.getElementById('panel-output').classList.toggle('active', tab === 'output');
+    }
+  }
+
+  // On resize restore both panels visible on desktop
+  window.addEventListener('resize', () => {
+    if (window.innerWidth > 640) {
+      document.getElementById('panel-input').classList.add('active');
+      document.getElementById('panel-output').classList.add('active');
+    }
+  });
+
+  // ── Generate ──
+  btnGen.addEventListener('click', async () => {
+    const text = inputEl.value.trim();
+    if (!text) { setStatus('⚠️ Performance description రాయండి.', 'error'); return; }
+
+    btnGen.disabled = true;
+    btnGen.textContent = 'Generating…';
+    setStatus('<span class="spinner"></span> Generating post…', 'loading');
+    outputEl.value = '';
+
+    try {
+      const res  = await fetch('/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+
+      outputEl.value = data.post;
+      setStatus('✅ Post ready! Copy చేయండి.', 'ok');
+
+      // Auto-switch to output tab on mobile
+      if (window.innerWidth <= 640) switchTab('output');
+
+    } catch (err) {
+      setStatus('❌ Error: ' + err.message, 'error');
+    } finally {
+      btnGen.disabled = false;
+      btnGen.textContent = '✨ Generate Post';
+    }
+  });
+
+  // ── Copy ──
+  btnCopy.addEventListener('click', () => {
+    if (!outputEl.value) return;
+    navigator.clipboard.writeText(outputEl.value).then(() => {
+      btnCopy.textContent = '✅ Copied!';
+      btnCopy.classList.add('copied');
+      setTimeout(() => {
+        btnCopy.textContent = '📋 Copy Post';
+        btnCopy.classList.remove('copied');
+      }, 2000);
+    });
+  });
+
+  // ── Clear ──
+  btnClear.addEventListener('click', () => {
+    inputEl.value = '';
+    outputEl.value = '';
+    setStatus('');
+    if (window.innerWidth <= 640) switchTab('input');
+    inputEl.focus();
+  });
+
+  // Ctrl+Enter / Cmd+Enter to generate
+  inputEl.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') btnGen.click();
+  });
+</script>
+</body>
+</html>
