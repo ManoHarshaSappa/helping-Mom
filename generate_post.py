@@ -66,6 +66,7 @@ def generate_post(input_text: str) -> str:
     lines: list[str] = [
         input_text.strip(),
         "",
+        "ప్రచారకులకు ధన్యవాదాలు, ఎకదా.",
         "మీకు నచ్చే మరో మంచి వీడియో చూడండి 👇",
         "",
         f"▶ {video['title']}",
