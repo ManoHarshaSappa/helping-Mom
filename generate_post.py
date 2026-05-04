@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from typing import Literal
+from typing import List
 
 from openai import OpenAI
 from pydantic import BaseModel
@@ -16,15 +16,12 @@ with open(_BASE / "videos.json", encoding="utf-8") as _f:
 with open(_BASE / "playlists.json", encoding="utf-8") as _f:
     PLAYLISTS: list[dict] = json.load(_f)
 
-with open(_BASE / "examples.json", encoding="utf-8") as _f:
-    EXAMPLES: list[dict] = json.load(_f)
-
 
 # ── Pydantic schema ───────────────────────────────────────────────────────────
 
 class BestPick(BaseModel):
-    pick_type: Literal["video", "playlist"]
-    selected_index: int  # index into videos or playlists depending on pick_type
+    selected_video_indices: List[int]  # 0–4 videos; empty list if none
+    selected_playlist_index: int       # -1 if no playlist
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
@@ -38,13 +35,22 @@ def _build_system_prompt() -> str:
         [{"index": i, "title": p["title"]} for i, p in enumerate(PLAYLISTS)],
         ensure_ascii=False, indent=2,
     )
-    return f"""You are helping a Telugu Harikatha artist pick the best content to recommend in a Facebook post.
+    return f"""You are helping a Telugu Harikatha artist recommend related YouTube content for a Facebook post.
+
+Given the event description, decide freely what to recommend based on how much related content exists:
+
+HOW TO DECIDE:
+- Strong single match → 1 video (selected_video_indices = [x], selected_playlist_index = -1)
+- Multiple related songs/keertanas → 2, 3, or 4 videos
+- Full story/series (Ramayana, Veerabrahmendra, Mahabharatham, Valli Kalyanam, Srinivasa Kalyanam, Parvati Kalyanam, Girija Kalyanam etc.) → 1 playlist (selected_video_indices = [], selected_playlist_index = x)
+- Full story AND related songs → playlist + 1 or 2 videos
+- No strong match → pick 3–4 loosely related videos
 
 RULES:
-- If the event is about a full story or series (Ramayana, Veerabrahmendra, Mahabharatham, Valli Kalyanam, Srinivasa Kalyanam, Parvati Kalyanam etc.) → pick_type = "playlist"
-- If the event is about a specific song, keertana, or short performance → pick_type = "video"
-
-Return pick_type and selected_index (0-based) from the correct catalog.
+- selected_video_indices: list of 0–4 valid video indices (0-based). Empty list [] if no videos.
+- selected_playlist_index: valid playlist index (0-based), or -1 if no playlist.
+- Never recommend more than 4 videos total.
+- Never recommend more than 1 playlist.
 
 VIDEO CATALOG
 {video_catalog}
@@ -74,33 +80,48 @@ def generate_post(input_text: str) -> str:
     if rec is None:
         raise RuntimeError("Could not pick content.")
 
-    if rec.pick_type == "playlist":
-        idx = rec.selected_index if 0 <= rec.selected_index < len(PLAYLISTS) else 0
-        item = PLAYLISTS[idx]
-        title_line = f"ఇక్కడ {item['title']} playlist పెట్టడం జరిగింది."
-        link_line  = f"Playlist లింక్: {item['link']}"
-        like_line  = "ఈ playlist మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి."
-    else:
-        idx = rec.selected_index if 0 <= rec.selected_index < len(VIDEOS) else 0
-        item = VIDEOS[idx]
-        title_line = f"ఇక్కడ {item['title']} వీడియోను పెట్టడం జరిగింది."
-        link_line  = f"వీడియో లింక్: {item['link']}"
-        like_line  = "ఈ వీడియో మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి."
+    has_playlist = rec.selected_playlist_index != -1 and 0 <= rec.selected_playlist_index < len(PLAYLISTS)
+    videos = [VIDEOS[i] for i in rec.selected_video_indices if 0 <= i < len(VIDEOS)]
+    playlist = PLAYLISTS[rec.selected_playlist_index] if has_playlist else None
 
-    lines: list[str] = [
-        input_text.strip(),
-        "",
-        "అందరికీ ధన్యవాదాలు.",
-        title_line,
-        link_line,
-        "",
-        like_line,
-        "",
-        "ఇలాంటి మరిన్ని అందమైన ఆధ్యాత్మిక వీడియోల కోసం నా YouTube ఛానల్ Sappa Bharathi Bhagavatarini ను సబ్‌స్క్రైబ్ చేయండి.",
-        YOUTUBE_CHANNEL_URL,
-        "",
-        "ధన్యవాదాలు 🙏",
-    ]
+    lines: list[str] = [input_text.strip(), "", "అందరికీ ధన్యవాదాలు.", ""]
+
+    # Playlist section
+    if playlist:
+        lines.append(f"ఇక్కడ {playlist['title']} playlist పెట్టడం జరిగింది.")
+        lines.append(f"Playlist లింక్: {playlist['link']}")
+        lines.append("")
+
+    # Videos section
+    if videos:
+        if len(videos) == 1:
+            lines.append(f"ఇక్కడ {videos[0]['title']} వీడియోను పెట్టడం జరిగింది.")
+            lines.append(f"వీడియో లింక్: {videos[0]['link']}")
+        else:
+            lines.append("ఇక్కడ కొన్ని సంబంధిత వీడియోలు పెట్టడం జరిగింది.")
+            lines.append("")
+            for v in videos:
+                lines.append(f"▶ {v['title']}")
+                lines.append(v['link'])
+                lines.append("")
+
+    lines.append("")
+
+    # Like/share/comment line — changes based on what was recommended
+    if playlist and videos:
+        lines.append("ఈ వీడియోలు మరియు playlist మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి.")
+    elif playlist:
+        lines.append("ఈ playlist మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి.")
+    elif len(videos) > 1:
+        lines.append("ఈ వీడియోలు మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి.")
+    else:
+        lines.append("ఈ వీడియో మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి.")
+
+    lines.append("")
+    lines.append("ఇలాంటి మరిన్ని అందమైన ఆధ్యాత్మిక వీడియోల కోసం నా YouTube ఛానల్ Sappa Bharathi Bhagavatarini ను సబ్‌స్క్రైబ్ చేయండి.")
+    lines.append(YOUTUBE_CHANNEL_URL)
+    lines.append("")
+    lines.append("ధన్యవాదాలు 🙏")
 
     return "\n".join(lines)
 
