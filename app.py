@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 load_dotenv()
 from generate_post import generate_post
+from generate_youtube_desc import generate_youtube_description
 
 app = Flask(__name__)
 
@@ -20,6 +21,20 @@ def generate():
     try:
         post = generate_post(text)
         return jsonify({"post": post})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/generate-youtube", methods=["POST"])
+def generate_youtube():
+    data = request.get_json(silent=True) or {}
+    title   = data.get("title", "").strip()
+    context = data.get("context", "").strip()
+    if not title:
+        return jsonify({"error": "Video title is empty"}), 400
+    try:
+        desc = generate_youtube_description(title, context)
+        return jsonify({"description": desc})
     except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
