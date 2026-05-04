@@ -1,18 +1,20 @@
 import json
 import sys
 from pathlib import Path
+from typing import Literal
 
 from openai import OpenAI
 from pydantic import BaseModel
 
 from config import YOUTUBE_CHANNEL_URL
 
-# ── Load video catalog once ───────────────────────────────────────────────────
-
 _BASE = Path(__file__).parent
 
 with open(_BASE / "videos.json", encoding="utf-8") as _f:
     VIDEOS: list[dict] = json.load(_f)
+
+with open(_BASE / "playlists.json", encoding="utf-8") as _f:
+    PLAYLISTS: list[dict] = json.load(_f)
 
 with open(_BASE / "examples.json", encoding="utf-8") as _f:
     EXAMPLES: list[dict] = json.load(_f)
@@ -20,38 +22,35 @@ with open(_BASE / "examples.json", encoding="utf-8") as _f:
 
 # ── Pydantic schema ───────────────────────────────────────────────────────────
 
-class BestVideo(BaseModel):
-    selected_video_index: int  # single best matching video index
-    video_description: str     # 1-2 sentences in Telugu describing what the video is about
+class BestPick(BaseModel):
+    pick_type: Literal["video", "playlist"]
+    selected_index: int  # index into videos or playlists depending on pick_type
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
 
 def _build_system_prompt() -> str:
-    catalog = json.dumps(
+    video_catalog = json.dumps(
         [{"index": i, "title": v["title"], "tags": v["tags"]} for i, v in enumerate(VIDEOS)],
         ensure_ascii=False, indent=2,
     )
-    style_examples = "\n\n".join(f"- {e['text']}" for e in EXAMPLES)
+    playlist_catalog = json.dumps(
+        [{"index": i, "title": p["title"]} for i, p in enumerate(PLAYLISTS)],
+        ensure_ascii=False, indent=2,
+    )
+    return f"""You are helping a Telugu Harikatha artist pick the best content to recommend in a Facebook post.
 
-    return f"""You are helping a Telugu Harikatha artist (Sappa Bharathi Bhagavatarini) write Facebook posts to promote her YouTube channel.
+RULES:
+- If the event is about a full story or series (Ramayana, Veerabrahmendra, Mahabharatham, Valli Kalyanam, Srinivasa Kalyanam, Parvati Kalyanam etc.) → pick_type = "playlist"
+- If the event is about a specific song, keertana, or short performance → pick_type = "video"
 
-STYLE GUIDE — write video_description in this same warm devotional Telugu style:
-{style_examples}
-
-Key style rules:
-- Use warm, emotional words like ఆత్మీయులందరికీ, మనసారా, భక్తి శ్రద్ధలతో, పావనమైన
-- Add devotional slogans naturally (జైశ్రీరామ్, శ్రీరామజయం, హరహర మహాదేవ, జయజయ కృష్ణ etc.) when matching the topic
-- Use emojis naturally: 🙏 💐 🌹 ▶ 🎵 ✨
-- Keep it short — 2 sentences max
-- Telugu must feel natural, not translated
-
-TASK — Given the event description:
-1. Pick the ONE most relevant video (selected_video_index, 0-based integer).
-2. Write video_description in the style above — 1-2 warm Telugu sentences about what this video contains and why viewers will love it.
+Return pick_type and selected_index (0-based) from the correct catalog.
 
 VIDEO CATALOG
-{catalog}"""
+{video_catalog}
+
+PLAYLIST CATALOG
+{playlist_catalog}"""
 
 
 SYSTEM_PROMPT = _build_system_prompt()
@@ -68,26 +67,34 @@ def generate_post(input_text: str) -> str:
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": input_text.strip()},
         ],
-        response_format=BestVideo,
+        response_format=BestPick,
     )
 
-    rec: BestVideo | None = response.choices[0].message.parsed
+    rec: BestPick | None = response.choices[0].message.parsed
     if rec is None:
-        raise RuntimeError("Could not pick a video.")
+        raise RuntimeError("Could not pick content.")
 
-    idx = rec.selected_video_index
-    if not (0 <= idx < len(VIDEOS)):
-        idx = 0
-    video = VIDEOS[idx]
+    if rec.pick_type == "playlist":
+        idx = rec.selected_index if 0 <= rec.selected_index < len(PLAYLISTS) else 0
+        item = PLAYLISTS[idx]
+        title_line = f"ఇక్కడ {item['title']} playlist పెట్టడం జరిగింది."
+        link_line  = f"Playlist లింక్: {item['link']}"
+        like_line  = "ఈ playlist మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి."
+    else:
+        idx = rec.selected_index if 0 <= rec.selected_index < len(VIDEOS) else 0
+        item = VIDEOS[idx]
+        title_line = f"ఇక్కడ {item['title']} వీడియోను పెట్టడం జరిగింది."
+        link_line  = f"వీడియో లింక్: {item['link']}"
+        like_line  = "ఈ వీడియో మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి."
 
     lines: list[str] = [
         input_text.strip(),
         "",
         "అందరికీ ధన్యవాదాలు.",
-        f"ఇక్కడ {video['title']} వీడియోను పెట్టడం జరిగింది.",
-        f"వీడియో లింక్: {video['link']}",
+        title_line,
+        link_line,
         "",
-        "ఈ వీడియో మీకు నచ్చితే లైక్ చేయండి. మీకు నచ్చిన వాళ్లతో షేర్ చేయండి. మీ అభిప్రాయాన్ని కామెంట్‌లో తెలియజేయండి.",
+        like_line,
         "",
         "ఇలాంటి మరిన్ని అందమైన ఆధ్యాత్మిక వీడియోల కోసం నా YouTube ఛానల్ Sappa Bharathi Bhagavatarini ను సబ్‌స్క్రైబ్ చేయండి.",
         YOUTUBE_CHANNEL_URL,
