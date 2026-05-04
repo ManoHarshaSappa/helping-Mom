@@ -14,6 +14,9 @@ _BASE = Path(__file__).parent
 with open(_BASE / "videos.json", encoding="utf-8") as _f:
     VIDEOS: list[dict] = json.load(_f)
 
+with open(_BASE / "examples.json", encoding="utf-8") as _f:
+    EXAMPLES: list[dict] = json.load(_f)
+
 
 # ── Pydantic schema ───────────────────────────────────────────────────────────
 
@@ -29,11 +32,23 @@ def _build_system_prompt() -> str:
         [{"index": i, "title": v["title"], "tags": v["tags"]} for i, v in enumerate(VIDEOS)],
         ensure_ascii=False, indent=2,
     )
-    return f"""You are helping a Telugu Harikatha artist pick the single best related video from her YouTube channel to share in a Facebook post.
+    style_examples = "\n\n".join(f"- {e['text']}" for e in EXAMPLES)
 
-Given the event description:
-1. Pick the ONE most relevant video from the catalog below (selected_video_index, 0-based integer).
-2. Write video_description: 1-2 sentences in Telugu that briefly explain what this video is about, in a warm devotional tone. Make it feel natural and inviting so viewers want to watch it.
+    return f"""You are helping a Telugu Harikatha artist (Sappa Bharathi Bhagavatarini) write Facebook posts to promote her YouTube channel.
+
+STYLE GUIDE — write video_description in this same warm devotional Telugu style:
+{style_examples}
+
+Key style rules:
+- Use warm, emotional words like ఆత్మీయులందరికీ, మనసారా, భక్తి శ్రద్ధలతో, పావనమైన
+- Add devotional slogans naturally (జైశ్రీరామ్, శ్రీరామజయం, హరహర మహాదేవ, జయజయ కృష్ణ etc.) when matching the topic
+- Use emojis naturally: 🙏 💐 🌹 ▶ 🎵 ✨
+- Keep it short — 2 sentences max
+- Telugu must feel natural, not translated
+
+TASK — Given the event description:
+1. Pick the ONE most relevant video (selected_video_index, 0-based integer).
+2. Write video_description in the style above — 1-2 warm Telugu sentences about what this video contains and why viewers will love it.
 
 VIDEO CATALOG
 {catalog}"""
