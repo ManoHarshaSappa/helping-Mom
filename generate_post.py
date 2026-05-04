@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-"""
-Harikatha Promotion: AI Content Assistant
-Generates structured Telugu social media posts for Harikatha performances.
-
-Usage:
-    python generate_post.py "Telugu performance description..."
-    echo "Telugu text" | python generate_post.py
-"""
-
 import json
 import sys
 from pathlib import Path
@@ -18,56 +8,74 @@ from pydantic import BaseModel
 
 from config import YOUTUBE_CHANNEL_URL
 
-# ── Load video collection (once at import time) ──────────────────────────────
+# ── Load catalogs once at import time ────────────────────────────────────────
 
-VIDEOS_FILE = Path(__file__).parent / "videos.json"
-with open(VIDEOS_FILE, encoding="utf-8") as _f:
+_BASE = Path(__file__).parent
+
+with open(_BASE / "videos.json", encoding="utf-8") as _f:
     VIDEOS: list[dict] = json.load(_f)
 
+with open(_BASE / "playlists.json", encoding="utf-8") as _f:
+    PLAYLISTS: list[dict] = json.load(_f)
 
-# ── Pydantic schema for Claude's structured output ───────────────────────────
+
+# ── Pydantic schema ───────────────────────────────────────────────────────────
 
 class PostRecommendation(BaseModel):
     match_strength: Literal["strong", "medium", "weak"]
-    selected_video_indices: List[int]
-    recommendation_text: str  # 2–3 sentences in Telugu
+    recommendation_type: Literal["videos", "playlist", "both"]
+    selected_video_indices: List[int]     # indices into VIDEOS list
+    selected_playlist_indices: List[int]  # indices into PLAYLISTS list
+    recommendation_text: str              # 2–3 sentences in Telugu
 
 
-# ── System prompt (static — cached across requests) ──────────────────────────
+# ── System prompt ─────────────────────────────────────────────────────────────
 
 def _build_system_prompt() -> str:
-    catalog = json.dumps(
-        [
-            {"index": i, "title": v["title"], "tags": v["tags"]}
-            for i, v in enumerate(VIDEOS)
-        ],
-        ensure_ascii=False,
-        indent=2,
+    video_catalog = json.dumps(
+        [{"index": i, "title": v["title"], "tags": v["tags"]} for i, v in enumerate(VIDEOS)],
+        ensure_ascii=False, indent=2,
     )
-    return f"""You are a Telugu devotional content writer helping a Harikatha artist create social media posts.
+    playlist_catalog = json.dumps(
+        [{"index": i, "title": p["title"]} for i, p in enumerate(PLAYLISTS)],
+        ensure_ascii=False, indent=2,
+    )
+    return f"""You are a Telugu devotional content writer helping a Harikatha artist promote her YouTube channel on Facebook.
 
 TASK
-Given a Telugu event description, you must:
-1. Identify the topic/theme (e.g., Rama, Sita, Hanuman, Krishna, Shiva, Ganesha, temple, festival).
-2. Select the most relevant videos from the catalog below.
-3. Determine match strength and number of videos to recommend:
-   - strong match → 1 video
-   - medium match → 2 videos
-   - weak match   → 3 videos
-4. Write a short, natural Telugu recommendation paragraph that:
-   - Suggests the selected videos as similar or related devotional content
-   - Encourages users to watch
-   - Uses words like "ఇలాంటి", "సంబంధిత", "మీకు నచ్చవచ్చు"
-   - Is devotional, emotional, and simple in tone
+Given a Telugu event description, generate a smart recommendation for related content from her channel.
+
+STEP 1 — Identify the theme
+Extract the main topic: Rama, Sita, Hanuman, Krishna, Shiva, Ganesha, Venkateswara, Parvati, Valli, devotional songs, keertanas, harikatha story, etc.
+
+STEP 2 — Choose recommendation_type using these rules:
+- "playlist"  → event is about a full story or series (e.g., Ramayana, Valli Kalyanam, Mahabharatham, Veerabrahmendra, Srinivasa Kalyanam). A playlist gives the viewer the whole series.
+- "videos"    → event is about a specific song, keertana, or short performance. Pick 1–3 individual videos.
+- "both"      → event has both a story element AND songs. Recommend 1 playlist + 1 video.
+
+STEP 3 — Choose how many items based on match_strength:
+- "strong" → 1 item total (1 playlist OR 1 video)
+- "medium" → 2 items total (2 videos OR 1 playlist + 1 video)
+- "weak"   → 3 items total (3 videos OR 1 playlist + 2 videos)
+
+STEP 4 — Write recommendation_text (2–3 sentences in Telugu) that:
+- Naturally connects the event to the recommended content
+- Uses warm devotional language: "ఇలాంటి", "సంబంధిత", "మీకు నచ్చవచ్చు", "తప్పకుండా చూడండి"
+- Is emotional, simple, and encouraging
 
 STRICT RULES
-- Keep the original user content EXACTLY as-is — do NOT modify it.
-- NEVER imply the recommended videos are from the same event as the description.
-- Do NOT use aggressive marketing language or exaggerated claims.
-- selected_video_indices must be valid 0-based indices from the catalog below.
+- Keep the original user content EXACTLY as-is — never modify it.
+- NEVER imply the recommended videos/playlists are from the same event.
+- selected_video_indices must be valid 0-based indices from the VIDEO CATALOG below.
+- selected_playlist_indices must be valid 0-based indices from the PLAYLIST CATALOG below.
+- If recommendation_type is "videos", selected_playlist_indices must be [].
+- If recommendation_type is "playlist", selected_video_indices must be [].
 
 VIDEO CATALOG
-{catalog}"""
+{video_catalog}
+
+PLAYLIST CATALOG
+{playlist_catalog}"""
 
 
 SYSTEM_PROMPT = _build_system_prompt()
@@ -76,14 +84,6 @@ SYSTEM_PROMPT = _build_system_prompt()
 # ── Core generation function ──────────────────────────────────────────────────
 
 def generate_post(input_text: str) -> str:
-    """Generate a complete Telugu social media post from a performance description.
-
-    Args:
-        input_text: A short Telugu text describing a recent Harikatha performance.
-
-    Returns:
-        A formatted multi-section social media post as a string.
-    """
     client = OpenAI()
 
     response = client.beta.chat.completions.parse(
@@ -97,19 +97,27 @@ def generate_post(input_text: str) -> str:
 
     rec: PostRecommendation | None = response.choices[0].message.parsed
     if rec is None:
-        raise RuntimeError("OpenAI could not generate a recommendation.")
+        raise RuntimeError("Could not generate a recommendation.")
 
-    # ── Assemble the final post ───────────────────────────────────────────────
     lines: list[str] = []
 
-    # Section 1 — original input text, preserved exactly
+    # Section 1 — original performance description (untouched)
     lines.append(input_text.strip())
     lines.append("")
 
-    # Section 2 — Telugu recommendation with video links
+    # Section 2 — Telugu recommendation text
     lines.append(rec.recommendation_text.strip())
     lines.append("")
 
+    # Section 3 — playlists (if any)
+    for idx in rec.selected_playlist_indices:
+        if 0 <= idx < len(PLAYLISTS):
+            playlist = PLAYLISTS[idx]
+            lines.append(f"▶ Playlist: {playlist['title']}")
+            lines.append(playlist["link"])
+            lines.append("")
+
+    # Section 4 — individual videos (if any)
     for idx in rec.selected_video_indices:
         if 0 <= idx < len(VIDEOS):
             video = VIDEOS[idx]
@@ -117,8 +125,8 @@ def generate_post(input_text: str) -> str:
             lines.append(video["link"])
             lines.append("")
 
-    # Section 3 — channel link and call to action
-    lines.append(f"🎙️ Youtube Channel : {YOUTUBE_CHANNEL_URL}")
+    # Section 5 — channel footer
+    lines.append(f"🎙️ మా Youtube Channel : {YOUTUBE_CHANNEL_URL}")
     lines.append("")
     lines.append("ఈ వీడియో మీకు నచ్చితే తప్పకుండా Like 👍, Share 🔁 మరియు Subscribe 🔔 చేయండి.")
     lines.append("మరిన్ని భక్తి పరమైన హరికథలు, కీర్తనలు మరియు పురాణ కథలు వినాలంటే మా ఛానల్ Sappa Bharathi Bhagavatarini ను సబ్‌స్క్రైబ్ చేసుకోండి. 🙏")
@@ -144,7 +152,6 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("\n⏳ Generating post...\n", file=sys.stderr)
-
     try:
         post = generate_post(text)
         print("\n" + "═" * 50)
