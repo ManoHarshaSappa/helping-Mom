@@ -28,35 +28,60 @@ POPULAR_MAP   = {p["link"]: p["views"] for p in POPULAR_VIDEOS}
 
 # Fixed footer added to every YouTube description
 FOOTER = """---------------------------------------------------------------------------------------------------
-#sappabharathi #HarikathaBharathi
-
-Name: Sappa Bharathi Bhagavatarini
-Location: Eluru resident
-Profession: Harikatha artist
-
-Those who want to conduct my Harikatha program can contact me at the following numbers:
-Phone: 98483 78407 / 97041 79407
+🎙️ DR. Sappa Bharathi Bhagavatarini (Top Grade Harikatha Artist)
+📍 Eluru, Andhra Pradesh
+📞 98483 78407 / 97041 79407
+హరికథ కార్యక్రమాల కోసం మాత్రమే సంప్రదించండి
 ---------------------------------------------------------------------------------------------------
-Sri Valli Kalyanam Harikatha (All Parts)
-https://youtube.com/playlist?list=PL2T1fjpT1UqfKhbr5zT3vkxI_gw9_LZMZ
----------------------------------------------------------------------------------------------------
-Sri Veera Brahmendra Swami Harikatha Sudha (All Parts)
-https://youtube.com/playlist?list=PL2T1fjpT1UqeCNqfAJ20mpaVaqhFzLqlF
----------------------------------------------------------------------------------------------------
-If you like the videos, please Like 👍, Share 🔁 and Subscribe 🔔 to my channel:
+🎬 Subscribe to our YouTube Channel for more devotional Harikatha videos:
+మరిన్ని భక్తి హరికథలు, కీర్తనలు మరియు పురాణ కథల కోసం మా ఛానల్‌ను సబ్‌స్క్రైబ్ చేయండి.
 {channel_url}
 ---------------------------------------------------------------------------------------------------
-Join our Telegram group:
+📋 HARIKATHA PLAYLISTS (All Parts):
+
+▶ Sri Valli Kalyanam Harikatha – Complete Series
+https://youtube.com/playlist?list=PL2T1fjpT1UqfKhbr5zT3vkxI_gw9_LZMZ
+
+▶ Sri Veera Brahmendra Swamy Harikatha Sudha – Complete Series
+https://youtube.com/playlist?list=PL2T1fjpT1UqeCNqfAJ20mpaVaqhFzLqlF
+
+▶ Lord Shri Rama – Complete Stories Collection
+https://www.youtube.com/playlist?list=PL2T1fjpT1UqceBhHKXX8fZ6sT29T9hOQr
+---------------------------------------------------------------------------------------------------
+🔥 BEST VIEWED VIDEOS (Most Popular):
+
+▶ శ్రీమద్ విరాట్ పోతులూరి వీరబ్రహ్మేంద్ర స్వామి చరిత్ర – సంపూర్ణ హరికథ (3,00,000+ views)
+https://youtu.be/MH8xAZG_oM8
+
+▶ శ్రీరామ జననం – సంపూర్ణ హరికథ (2,40,000+ views)
+https://youtu.be/WpKCS_321IA
+
+▶ శ్రీ వల్లీ కళ్యాణం హరికథ (40,000+ views)
+https://youtu.be/Bwf105eLluM
+---------------------------------------------------------------------------------------------------
+🏆 AWARDS & RECOGNITION:
+డాక్టరేట్, నంది అవార్డు, సిల్వర్ క్రౌన్ అవార్డు మరియు హంస అవార్డు సహా అనేక ప్రతిష్ఠాత్మక పురస్కారాలు అందుకున్న సప్పా భారతి భాగవతారిణి గారి అవార్డుల సేకరణ చూడండి.
+
+▶ Awards Playlist – Moments of Honor
+https://www.youtube.com/playlist?list=PL2T1fjpT1Uqeay9A_lvIgHZ_QTJ4o0bVm
+---------------------------------------------------------------------------------------------------
+💬 Join our WhatsApp Group:
+https://chat.whatsapp.com/KitCWyU1JwjIKPjZOBWe7g
+---------------------------------------------------------------------------------------------------
+📢 Join our Telegram Group:
 https://t.me/sappabharathibhagavatariniyt
 ---------------------------------------------------------------------------------------------------
-For more information:
+🌐 More Information / Blog:
 https://sappabharathibhagavatarini.blogspot.com/2021/08/sappa-bharathi-bhagavatarini-photos.html
 ---------------------------------------------------------------------------------------------------
-Contact (Social Media):
+📱 Follow us on Social Media:
 Facebook  : https://www.facebook.com/people/Sappa-Bharathi/100008436812038/
 Instagram : https://www.instagram.com/sappa_bharathi/
 Telegram  : https://t.me/sappabharathibhagavatariniyt
-Blog      : https://sappabharathibhagavatarini.blogspot.com/2021/08/sappa-bharathi-bhagavatarini-photos.html
+Portfolio : https://manoharshasappa.github.io/DR.SappaBharathiBhagavatarini/
+---------------------------------------------------------------------------------------------------
+👍 Like చేయండి | 🔁 Share చేయండి | 🔔 Subscribe చేయండి
+Thank you for watching! ధన్యవాదాలు 🙏
 ---------------------------------------------------------------------------------------------------""".format(channel_url=YOUTUBE_CHANNEL_URL)
 
 
