@@ -19,6 +19,7 @@ with open(_BASE / "videos.json", encoding="utf-8") as _f:
 
 class BestVideo(BaseModel):
     selected_video_index: int  # single best matching video index
+    video_description: str     # 1-2 sentences in Telugu describing what the video is about
 
 
 # ── System prompt ─────────────────────────────────────────────────────────────
@@ -30,8 +31,9 @@ def _build_system_prompt() -> str:
     )
     return f"""You are helping a Telugu Harikatha artist pick the single best related video from her YouTube channel to share in a Facebook post.
 
-Given the event description, pick the ONE most relevant video from the catalog below.
-Return only selected_video_index (0-based integer).
+Given the event description:
+1. Pick the ONE most relevant video from the catalog below (selected_video_index, 0-based integer).
+2. Write video_description: 1-2 sentences in Telugu that briefly explain what this video is about, in a warm devotional tone. Make it feel natural and inviting so viewers want to watch it.
 
 VIDEO CATALOG
 {catalog}"""
@@ -71,6 +73,8 @@ def generate_post(input_text: str) -> str:
         "",
         f"▶ {video['title']}",
         video["link"],
+        "",
+        rec.video_description.strip(),
         "",
         "ఈ వీడియో నచ్చితే Like 👍, Share 🔁 మరియు Comment ✍️ చేయండి.",
         "",
